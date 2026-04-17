@@ -1,0 +1,58 @@
+<!doctype html>
+<html>
+  <head>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-basic-3.0.0.min.js"></script>
+    <style>
+      body { font-family: arial, sans-serif; margin: 0; padding: 8px; }
+      #status { font-size: 0.85em; color: #888; margin-bottom: 4px; }
+    </style>
+  </head>
+  <body>
+    <div id="status">Loading...</div>
+    <div id="chart"></div>
+
+    <script>
+      var shortCode = {{ short_code | tojson }};
+      var dataUrl = '/chart/' + shortCode + '/data';
+      var initialized = false;
+
+      function fetchAndRender() {
+        $.ajax({
+          url: dataUrl,
+          type: 'GET',
+          success: function(graphJSON) {
+            var fig = (typeof graphJSON === 'string') ? JSON.parse(graphJSON) : graphJSON;
+            var layout = Object.assign({ height: window.innerHeight - 40 }, fig.layout || {});
+            if (!initialized) {
+              Plotly.newPlot('chart', fig.data, layout);
+              initialized = true;
+            } else {
+              Plotly.react('chart', fig.data, layout);
+            }
+            Plotly.relayout('chart', { 'xaxis.autorange': false, 'yaxis.autorange': true });
+
+            // Extract total PnL from the "Total PNL" trace (first scattergl)
+            var totalTrace = fig.data.find(function(t) { return t.name === 'Total PNL'; });
+            var totalPnl = null;
+            if (totalTrace && totalTrace.y && totalTrace.y.length) {
+              var vals = totalTrace.y.filter(function(v) { return v != null; });
+              if (vals.length) totalPnl = vals[vals.length - 1];
+            }
+            var pnlText = totalPnl != null ? '  |  Total PnL: ' + (totalPnl >= 0 ? '+' : '') + totalPnl.toFixed(0) : '';
+            $('#status').text('Last updated: ' + new Date().toLocaleTimeString() + pnlText);
+            $('#status').css('color', totalPnl != null && totalPnl < 0 ? '#c00' : '#888');
+          },
+          error: function(xhr) {
+            var msg = xhr.responseJSON ? xhr.responseJSON.error : xhr.responseText;
+            $('#status').text('Error: ' + msg);
+            $('#status').css('color', '#c00');
+          }
+        });
+      }
+
+      fetchAndRender();
+      setInterval(fetchAndRender, 15000);
+    </script>
+  </body>
+</html>

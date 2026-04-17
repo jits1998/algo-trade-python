@@ -1,0 +1,59 @@
+// For format details, see https://aka.ms/devcontainer.json. For config options, see the
+// README at: https://github.com/devcontainers/templates/tree/main/src/ubuntu
+{
+	"name": "Ubuntu",
+	// Or use a Dockerfile or Docker Compose file. More info: https://containers.dev/guide/dockerfile
+	"image": "mcr.microsoft.com/devcontainers/base:noble",
+	"features": {
+		"ghcr.io/devcontainers/features/nvidia-cuda:2.0.0": {
+			"cudaVersion": "12.6"
+		},
+		"ghcr.io/devcontainers/features/python:1": {
+			"version": "3.12"
+		},
+		"ghcr.io/devcontainers/features/sshd:1": {},
+		"ghcr.io/devcontainers/features/node:1": {
+			"version": "lts",
+			"installYarnUsingApt": false
+		},
+		"ghcr.io/jungaretti/features/vim:1": {},
+		"ghcr.io/wxw-matt/devcontainer-features/command_runner:0": {},
+		"ghcr.io/jayree/devcontainer-features/npm-registry:1": {},
+		"ghcr.io/devcontainers-extra/features/npm-package:1": {},
+		"ghcr.io/devcontainers-extra/features/wget-apt-get:1": {},
+		"ghcr.io/hwaien/devcontainer-features/match-host-time-zone": {},
+		"ghcr.io/devcontainers/features/aws-cli:1": {
+			"version": "latest"
+		},
+		"ghcr.io/rails/devcontainer/features/postgres-client:1": {}
+	},
+	"runArgs": [
+		"--cpus=12",
+		"--network=host"
+	],
+	"containerEnv": {
+		"CPU_LIMIT": "80%",
+	    "TZ": "Asia/Kolkata"
+	},
+	// Features to add to the dev container. More info: https://containers.dev/features.
+	// "features": {},
+	// Use 'forwardPorts' to make a list of ports inside the container available locally.
+	// "forwardPorts": [],
+	// Use 'postCreateCommand' to run commands after the container is created.
+	// "postCreateCommand": "uname -a",
+	"postCreateCommand": "bash .devcontainer/post-create.sh",
+	"mounts": [
+	],
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"anthropic.claude-code",
+				"ms-python.autopep8",
+				"ms-python.black-formatter",
+				"ms-python.isort",
+				"ms-python.debugpy",
+				"esbenp.prettier-vscode"
+			]
+		}
+	}
+}

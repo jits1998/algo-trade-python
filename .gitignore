@@ -1,1 +1,9 @@
 __pycache__
+flask_session
+**/sandbox/*
+*.pyc
+.vscode
+config/server.json
+**/.venv/*
+data_cache/*
+**/logs/*

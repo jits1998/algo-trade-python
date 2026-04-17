@@ -23,8 +23,11 @@
     }
   </style>
   <script>
-    function loginToBroker() {
-      window.location.href =  "http://localhost:8080" + "/apis/broker/login/zerodha"
+    function loginToRunAlgo() {
+      window.location.href = "/apis/broker/login/{{broker}}"
+    }
+    function loginToBacktest() {
+      window.location.href = "/apis/broker/login/icici?redirect_to=backtest"
     }
   </script>
 
@@ -32,9 +35,13 @@
 
 <body>
   <h1 style="color: blue" class="center">Welcome to algo trading in python</h1>
+  <h3 class="center">Choose an option:</h3>
   <div class="center">
-    <button class="button" onClick="loginToBroker()">
-      Login to Broker
+    <button class="button" onClick="loginToRunAlgo()">
+      Login to Run Algo
+    </button>
+    <button class="button" onClick="loginToBacktest()">
+      Login to Backtest
     </button>
   </div>
 </body>

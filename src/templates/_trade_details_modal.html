@@ -1,0 +1,93 @@
+<!-- Trade Details Modal — KO-bound, requires a vm with modalTitle/modalTrades/modalSummary/modalLoading -->
+<div class="modal fade" id="tradeDetailsModal" tabindex="-1" aria-labelledby="tradeDetailsModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="tradeDetailsModalLabel" data-bind="text: modalTitle">Trade Details</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="tradeDetailsModalBody">
+        <!-- Loading spinner -->
+        <!-- ko if: modalLoading() -->
+        <div class="text-center">
+          <div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div>
+        </div>
+        <!-- /ko -->
+
+        <!-- No trades message (only shown after a fetch completes with empty result) -->
+        <!-- ko if: !modalLoading() && modalSummary() && modalSummary().empty -->
+        <div class="alert alert-info">No trades found for this date/strategy.</div>
+        <!-- /ko -->
+
+        <!-- Error message -->
+        <!-- ko if: modalSummary() && modalSummary().error -->
+        <div class="alert alert-danger">
+          <strong>Error:</strong> <span data-bind="text: modalSummary().error"></span>
+        </div>
+        <!-- /ko -->
+
+        <!-- Trade table -->
+        <!-- ko if: modalTrades().length > 0 -->
+        <div class="table-responsive">
+          <table class="table table-sm table-striped table-hover">
+            <thead class="table-dark">
+              <tr>
+                <th>#</th>
+                <th>Symbol</th>
+                <th>Strategy</th>
+                <th>Entry Time</th>
+                <th>Exit Time</th>
+                <th class="text-end">Entry</th>
+                <th class="text-end">Exit</th>
+                <th class="text-end">PnL</th>
+                <th>Exit Reason</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- ko foreach: modalTrades -->
+              <tr>
+                <td data-bind="text: $index() + 1"></td>
+                <td data-bind="text: symbol || 'N/A'"></td>
+                <td data-bind="text: strategy || 'N/A'"></td>
+                <td data-bind="text: entry_time || '-'"></td>
+                <td data-bind="text: exit_time || '-'"></td>
+                <td class="text-end" data-bind="text: (entry || 0).toFixed(2)"></td>
+                <td class="text-end" data-bind="text: (exit || 0).toFixed(2)"></td>
+                <td class="text-end" data-bind="pnlCell: pnl || 0"></td>
+                <td data-bind="text: exit_reason || '-'"></td>
+              </tr>
+              <!-- /ko -->
+              <!-- TOTAL row -->
+              <!-- ko with: modalSummary() -->
+              <tr class="table-secondary" style="border-top: 2px solid #000;">
+                <td colspan="7"><strong>TOTAL</strong></td>
+                <td class="text-end" data-bind="pnlCell: totalPnl"></td>
+                <td></td>
+              </tr>
+              <!-- /ko -->
+            </tbody>
+          </table>
+        </div>
+        <!-- Summary -->
+        <!-- ko with: modalSummary() -->
+        <div class="mt-3">
+          <h6>Summary</h6>
+          <p class="mb-1"><strong>Total Trades:</strong>
+            <span data-bind="text: count"></span>
+            (W: <span data-bind="text: winCount"></span>,
+             L: <span data-bind="text: lossCount"></span>)
+          </p>
+          <p class="mb-1"><strong>Win Rate:</strong> <span data-bind="text: winRate + '%'"></span></p>
+          <p class="mb-1"><strong>Total PnL:</strong>
+            <span class="fw-bold" data-bind="pnlCell: totalPnl"></span>
+          </p>
+        </div>
+        <!-- /ko -->
+        <!-- /ko -->
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>

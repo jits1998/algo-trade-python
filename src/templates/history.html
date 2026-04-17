@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>{{short_code}} - History {% if trade_date %}{{trade_date}}{% endif %}</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=0.9">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <style>
+    .table td, .table th {
+        padding-left: 0.25em!important;
+        padding-right: 0.25em!important;
+    }
+  </style>
+  <script>
+    $(function () {
+      {% if strategies %}
+      $("title").html($("title").html() + " - " + $(".pnl").text())
+      {% endif %}
+      document.body.style.zoom="90%";
+    });
+
+    function loadDate() {
+      const selectedDate = document.getElementById('dateInput').value;
+      const shortCode = "{{short_code}}";
+      if (selectedDate) {
+        window.location.href = `/history/${shortCode}?date=${selectedDate}`;
+      }
+    }
+  </script>
+</head>
+<body class="p-2">
+    {% macro print_price (price) %}
+    {%if price> 0 %}
+    <b>{{"%.2f"|format(price)}}</b>
+    {% else %}
+    {{"%.2f"|format(price)}}
+    {% endif %}
+    {% endmacro %}
+
+
+    <div class="container-fluid font-monospace">
+        <div class="row justify-content-center">
+            <div class="col-xxl-7">
+                {% if trade_date is none %}
+                <div class="row bg-light">
+                    <div class="card my-1">
+                        <h5 class="text-center">Trade History - {{short_code}}</h5>
+                    </div>
+                </div>
+                <div class="row gx-0 my-3">
+                    <div class="col text-center">
+                        <div class="card">
+                            <div class="card-body">
+                                <h6 class="card-title">Select a Date</h6>
+                                <div class="mb-3">
+                                    <label for="dateInput" class="form-label">Choose Date:</label>
+                                    <input type="date" id="dateInput" class="form-control w-auto mx-auto" />
+                                </div>
+                                <button class="btn btn-primary" onclick="loadDate()">Load History</button>
+                                <div class="mt-3">
+                                    <a href="/me/{{short_code}}" class="btn btn-outline-secondary">Back to Home</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% elif error %}
+                <div class="row bg-light">
+                    <div class="card my-1">
+                        <h5 class="text-center">Trade History - {{short_code}}</h5>
+                    </div>
+                </div>
+                <div class="row gx-0 my-3">
+                    <div class="col text-center">
+                        <div class="alert alert-warning">
+                            {{error}}
+                        </div>
+                        <div class="card">
+                            <div class="card-body">
+                                <h6 class="card-title">Select a Different Date</h6>
+                                <div class="mb-3">
+                                    <label for="dateInput" class="form-label">Choose Date:</label>
+                                    <input type="date" id="dateInput" class="form-control w-auto mx-auto" value="{{trade_date}}" />
+                                </div>
+                                <button class="btn btn-primary" onclick="loadDate()">Load History</button>
+                                <div class="mt-3">
+                                    <a href="/me/{{short_code}}" class="btn btn-outline-secondary">Back to Home</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% else %}
+                <div class="row bg-light">
+                    <div class="row gx-0">
+                        <div class="card my-1">
+                            <h5 class="text-center">
+                                Trade History for {{trade_date}} ({{day_of_week}}) - {{short_code}}
+                            </h5>
+                            <h6 class="text-center">
+                                {{strategies|length}} strategies with {{multiple}}x multiplier
+                            </h6>
+                        </div>
+                    </div>
+                    <div class="row gx-0 my-2">
+                        <div class="col text-center">
+                            <label for="dateInput" class="form-label me-2">Select Date:</label>
+                            <input type="date" id="dateInput" class="form-control form-control-sm d-inline-block w-auto" value="{{trade_date}}" />
+                            <button class="btn btn-primary btn-sm ms-2" onclick="loadDate()">Load</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <table class="table border">
+                    {% set ns = namespace(total_pnl=0) %}
+                    {% for strategy_name, strategy_data in strategies.items() %}
+                        <tr class="table-light">
+                            <th
+                                style="{% if not strategy_data.info.get('enabled', True) %} font-weight:normal;font-style: italic;{% endif %}"
+                                class="text-start px-1"
+                                colspan="9">
+                                {{strategy_name}}
+                                {% if strategy_data.info.get('target') %}
+                                :: {{strategy_data.info.get('lots', 1)}}x ==> {{"%.2f"|format(strategy_data.info.get('target', 0) * strategy_data.info.get('lots', 1))}} @ {{"%.2f"|format(strategy_data.info.get('stoploss', 0) * strategy_data.info.get('lots', 1))}}
+                                {% endif %}
+                            </th>
+                        </tr>
+                        {% set strategy_ns = namespace(pnl=0) %}
+                        {% for trade in strategy_data.trades %}
+                        {% if trade.tradeState not in ['disabled'] %}
+                        {% set strategy_ns.pnl = strategy_ns.pnl + trade.pnl %}
+                        <tr class="border-0 border-bottom {% if trade.exit == 0 and trade.tradeState not in ['cancelled'] %}table-active{%else%}table-default{%endif%}">
+                            <td class="text-center border-0 border-end border-secondary-subtle">{{trade.startTimestamp|ctime}}</td>
+                            <td class="border-0 border-end border-secondary-subtle">{{trade.tradingSymbol}}</td>
+                            <td class="text-center border-0 border-end border-secondary-subtle d-none d-md-table-cell">{{trade.direction}}</td>
+                            <td class="text-end border-0 border-end border-secondary-subtle d-none d-md-table-cell">{{trade.filledQty}}</td>
+                            <td class="text-end border-0 border-end border-secondary-subtle d-md-none" colspan="2">
+                                <b>{{ "-" if trade.direction =="SHORT" else "+"}}</b>{{trade.filledQty}}
+                            </td>
+                            <td class="text-end border-0 border-end border-secondary-subtle">{{"%.2f"|format(trade.entry)}}</td>
+                            {% if trade.exit == 0 and trade.tradeState not in ['cancelled'] %}
+                            <td class="text-end border-0">{{"%.2f"|format(trade.cmp)}}</td>
+                            <td class="text-end border-0 border-start border-secondary-subtle text-end">{{"%.2f"|format(trade.pnl)}}</td>
+                            <td class="text-center border-0 border-start border-secondary-subtle d-none d-md-table-cell">
+                                {{ "SL @ "+ (trade.stopLoss|string) if trade.entry > 0 else "<b>Open</b> @ "|safe + (trade.requestedEntry|string) }}
+                            </td>
+                            <td class="border-0 text-center">-</td>
+                            {% else %}
+                            <td class="border-0 text-end">{{"%.2f"|format(trade.exit)}}{% if trade.slWhiskerHit %} <span title="Tick-only SL — candle did not confirm" style="cursor:help">&#9888;</span>{% endif %}</td>
+                            <td class="border-0 text-end border-start border-secondary-subtle text-end">{{"%.2f"|format(trade.pnl)}}</td>
+                            <td class="border-0 border-start border-secondary-subtle text-center d-none d-md-table-cell">{{trade.exitReason or trade.tradeState}}</td>
+                            <td class="border-0 border-start border-secondary-subtle text-center">{{trade.endTimestamp|ctime or "-"}}</td>
+                            {% endif %}
+                        </tr>
+                        {% endif %}
+                        {% endfor %}
+                        <tr>
+                            <td colspan="6" class="text-end">Total :: </td>
+                            <td colspan="1" class="text-end">{{ print_price(strategy_ns.pnl) }}</td>
+                            <td colspan="2"></td>
+                        </tr>
+                        {% set ns.total_pnl = ns.total_pnl + strategy_ns.pnl %}
+                    {% endfor %}
+                    {% if strategies|length > 0 %}
+                    <tr>
+                        <td colspan="6" class="text-end">
+                            Overall Total:
+                        </td>
+                        <td colspan="1" class="text-end">
+                            <span class="pnl">{{ print_price(ns.total_pnl) }}</span>
+                        </td>
+                        <td colspan="2"></td>
+                    </tr>
+                    {% endif %}
+                    </table>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</body>
+</html>

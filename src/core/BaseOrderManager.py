@@ -1,10 +1,9 @@
 
-from core.Controller import Controller
 
 class BaseOrderManager:
-  def __init__(self, broker):
+  def __init__(self, broker, brokerHandle):
     self.broker = broker
-    self.brokerHandle = Controller.getBrokerLogin().getBrokerHandle()
+    self.brokerHandle = brokerHandle
 
   def placeOrder(self, orderInputParams):
     pass
@@ -18,8 +17,14 @@ class BaseOrderManager:
   def cancelOrder(self, order):
     pass
 
+  def updateOrder(self, order, data):
+    pass
+
   def fetchAndUpdateAllOrderDetails(self, orders):
     pass
+
+  def getMaxOrderQuantity(self, tradingSymbol):
+    return None  # No limit by default
 
   def convertToBrokerProductType(self, productType):
     return productType

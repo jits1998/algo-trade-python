@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <title>{{short_code}} || </title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=0.9">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <script src="https://unpkg.com/knockout@3.5.1/build/output/knockout-latest.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/knockout.mapping/2.4.1/knockout.mapping.min.js"></script>
+  <style>
+    .table td, .table th {
+        padding-left: 0.25em!important;
+        padding-right: 0.25em!important;
+    }
+        /* ensures the increment/decrement arrows always display */
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button {
+      opacity: 1;
+    }
+    a.advance{
+      text-decoration: none;
+    }
+    a.collapsing {
+      display: none;
+    }
+  </style>
+  <script>
+    function clearAdv(){
+      $("input[name='trigger']").val(0);
+      $("input[name='target']").val(0);
+    }
+
+    function updateAdv(price){
+      price = parseFloat(price)
+
+      direction = index = $("input[type=radio][name='direction']:checked").val();
+      dirMulti = -1
+      if (direction == "LONG"){
+        dirMulti = +1
+      }
+      $("input[name='trigger']").val(Math.round((price + dirMulti * 0.01 * price) * 100)/100);
+      $("input[name='target']").val(Math.round((price + dirMulti * 0.1 * price ) * 100)/100);
+    }
+    function updatePrice(){
+        index = $("#index").val();
+        strike = $("#strike").val();
+        type = $("input[type=radio][name='type']:checked").val();
+        price = metadata[index].quote[type][strike];
+        if(price){
+          price = parseFloat(price)
+          $("input[name='sl']").val("");
+          $("input[name='price']").val(price);
+          if($("div.advance").hasClass("show")){
+            updateAdv(price)
+          }
+        }else {
+          $("input[name='price']").val("")
+          clearAdv()
+        }
+      }
+      function showQuote(){
+        index = $("#index").val();
+        strike = $("#strike").val();
+        type = $("input[type=radio][name='type']:checked").val();
+        if (index){
+          if(metadata[index].quote[type][strike]){
+            updatePrice();
+          }else{
+            $.get("{{request.path}}/getQuote", { index: index,
+                                                strike: strike,
+                                                type: type
+                                              }).done(function(data){
+                                                metadata[index].quote[type][strike]=data;
+                                                updatePrice();
+                                              });
+          }
+        }
+      }
+      directionChanged = function(){
+        showQuote()
+        direction = index = $("input[type=radio][name='direction']:checked").val();
+        if (direction == "LONG"){
+          $("#go1").addClass("btn-primary")
+          $("#go1").removeClass("btn-danger")
+        }else {
+          $("#go1").removeClass("btn-primary")
+          $("#go1").addClass("btn-danger")
+        }
+      }
+      openManualOrder = function(){
+        $("#index").trigger('change');
+      };
+    $(function () {
+      $("title").html($("title").html() + $(".pnl").text())
+      $(document).on("click", "#powermode", function(){
+          vm.powerMode(true);
+      });
+      metadata = {
+                  NIFTY : {
+                    ATM:0,
+                    round:50,
+                    lot:65,
+                    quote:{ CE:{}, PE:{} }
+                  },
+                  BANKNIFTY: {
+                    ATM: 0,
+                    round:100,
+                    lot:30,
+                    quote:{ CE:{}, PE:{} }
+                  },
+                  SENSEX:{
+                    ATM: 0,
+                    round:100,
+                    lot:20,
+                    quote:{ CE:{}, PE:{} }
+                  }
+                }
+      {% if isReady %}
+      clearAdv();
+
+      multiple={{multiple}};
+
+      metadata.NIFTY.ATM=0;
+      metadata.BANKNIFTY.ATM=0;
+      metadata.SENSEX.ATM=0;
+
+      getQuote = function(){
+        clearTimeout(metadata.tm);
+        metadata.tm = setTimeout( showQuote, 500);
+      };
+      $(document).on("change", "#strike", getQuote);
+      $(document).on("change", "input[type=radio][name='type']", getQuote);
+      $(document).on("shown.bs.collapse", "div.advance", showQuote);
+      $(document).on("hidden.bs.collapse", "div.advance", clearAdv);
+      $(document).on("change", "input[type=radio][name='direction']", directionChanged);
+      $(document).on("change", "select[name='strategyName']", function(){
+        var strategyName = $(this).val();
+        var strategy = strategyName ? vm.strategies().find(function(s){ return s.name() === strategyName; }) : null;
+        var symbol = strategy ? strategy.symbol : null;
+        if (symbol && metadata[symbol]) {
+          $("#index").val(symbol).trigger('change');
+          $("#index").css({ 'pointer-events': 'none', 'opacity': '0.6' });
+        } else {
+          $("#index").css({ 'pointer-events': '', 'opacity': '' });
+          $("#index").trigger('change');
+        }
+      });
+      $(document).on("change", "#index", function(){
+        var selectedIndex = $("#index").val();
+        $("#indexValue").val(selectedIndex);
+        $("#strike").val(metadata[selectedIndex].ATM).trigger('change');
+        $("#strike").attr('step', metadata[selectedIndex].round);
+        $("#strike").attr('min', metadata[selectedIndex].ATM - 15 * metadata[selectedIndex].round);
+        $("#strike").attr('max', metadata[selectedIndex].ATM + 15 * metadata[selectedIndex].round);
+        $("#qty").val(metadata[selectedIndex].lot * Math.ceil(multiple / 4));
+        $("#qty").attr('step', metadata[selectedIndex].lot * Math.ceil(multiple / 4));
+        $("#qty").attr('min', metadata[selectedIndex].lot * Math.ceil(multiple / 4));
+        $("#qty").attr('max', metadata[selectedIndex].lot * multiple * 2);
+      });
+
+
+      {% endif %}
+      document.body.style.zoom="90%";
+      $('a[data-bs-toggle="tab"]').on('show.bs.tab', function(e) {
+        localStorage.setItem('activeTab', $(e.target).attr('href'));
+      });
+      var activeTab = localStorage.getItem('activeTab');
+      if(activeTab){
+        $('#sections a[href="' + activeTab + '"]').tab('show');
+      }else {
+        $('#sections a[href="#tabs-strategies"]').tab('show');
+      }
+    });
+    function confirmExit(link, identity){
+      if (confirm ("Please confirm exiting "+identity)){
+          window.location.href=link;
+      }
+    }
+
+    {% if algoStarted %}
+    // ── Knockout custom bindings ────────────────────────────────────────────
+    ko.bindingHandlers.fmt2 = {
+      update: function(el, va) { el.textContent = parseFloat(ko.unwrap(va())).toFixed(2); }
+    };
+    ko.bindingHandlers.fmtPnl = {
+      update: function(el, va) {
+        var v = parseFloat(ko.unwrap(va()));
+        var s = v.toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2});
+        el.innerHTML = v > 0 ? '<b>' + s + '</b>' : s;
+      }
+    };
+    ko.bindingHandlers.fmtLtp = {
+      update: function(el, va) {
+        var raw = va();
+        var v = typeof raw === 'function' ? raw() : ko.unwrap(raw);
+        el.textContent = parseFloat(v).toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2});
+      }
+    };
+    ko.bindingHandlers.fmtL = {
+      update: function(el, va) {
+        el.textContent = (parseFloat(ko.unwrap(va())) / 100000)
+          .toLocaleString('en-IN', {minimumFractionDigits:2, maximumFractionDigits:2}) + 'L';
+      }
+    };
+
+    // ── ViewModel ───────────────────────────────────────────────────────────
+    var vm = {
+      strategies:        ko.observableArray([]),
+      ltps:              ko.observable({}),
+      margins:           ko.observable({}),
+      orders:            ko.observableArray([]),
+      positions:         ko.observableArray([]),
+      highestMarginUsed: ko.observable(0),
+      dayHighestPnl:     ko.observable(0),
+      dayLowestPnl:      ko.observable(0),
+      isReady:           ko.observable(false),
+      basePath:          '{{ request.path }}',
+      powerMode:         ko.observable(false),
+      shadowDeviations:  ko.observableArray([]),
+      shadowLastRun:     ko.observable(null),
+      shadowStatus:      ko.observable('idle'),
+      shadowTrades:      ko.observableArray([]),
+    };
+    vm.availableMargin = ko.computed(function() {
+      var m = vm.margins();
+      if (!m || !m.equity) return 0;
+      var eq = m.equity;
+      return eq.available.collateral + eq.available.opening_balance - eq.utilised.debits;
+    });
+    vm.marginInDeficit = ko.computed(function() {
+      var m = vm.margins();
+      if (!m || !m.equity) return false;
+      return m.equity.available.live_balance < 0;
+    });
+    vm.overallPnl = ko.computed(function() {
+      return vm.strategies().reduce(function(sum, s) {
+        return sum + s.pnl();
+      }, 0);
+    });
+
+    function makeTrade(data) {
+      var t = {
+        tradeID:         ko.observable(data.tradeID),
+        tradingSymbol:   ko.observable(data.tradingSymbol),
+        direction:       ko.observable(data.direction),
+        filledQty:       ko.observable(data.filledQty),
+        entry:           ko.observable(data.entry),
+        exit:            ko.observable(data.exit),
+        cmp:             ko.observable(data.cmp),
+        pnl:             ko.observable(data.pnl),
+        stopLoss:        ko.observable(data.stopLoss),
+        requestedEntry:  ko.observable(data.requestedEntry),
+        startTimestamp:  ko.observable(data.startTimestamp),
+        endTimestamp:    ko.observable(data.endTimestamp),
+        exitReason:      ko.observable(data.exitReason),
+        tradeState:      ko.observable(data.tradeState),
+        slWhiskerHit:    ko.observable(data.slWhiskerHit),
+      };
+      t.isActive = ko.computed(function() {
+        return t.exit() == 0 && t.tradeState() !== 'cancelled';
+      });
+      t.deviationTag = ko.computed(function() {
+        if (!t.isActive()) return null;
+        var sym = t.tradingSymbol();
+        var tid = t.tradeID();
+        var devs = vm.shadowDeviations();
+        for (var i = 0; i < devs.length; i++) {
+          var d = devs[i];
+          if (d.type === 'EXTRA_IN_LIVE') {
+            if (d.live_trade_id === tid) return d;
+          } else {
+            if (d.live_symbol === sym) return d;
+          }
+        }
+        return null;
+      });
+      t.slOrOpen = ko.computed(function() {
+        return t.entry() > 0
+          ? 'SL @ ' + t.stopLoss()
+          : 'Open @ ' + t.requestedEntry();
+      });
+      return t;
+    }
+
+    function makeStrategy(data) {
+      var trades = ko.observableArray((data.trades || []).map(makeTrade));
+      var s = {
+        name:       ko.observable(data.name),
+        lots:       ko.observable(data.lots),
+        enabled:    ko.observable(data.enabled),
+        paused:     ko.observable(data.paused || false),
+        target:     ko.observable(data.target),
+        sl:         ko.observable(data.sl),
+        symbol:     data.symbol || null,
+        trades:     trades,
+        showShadow: ko.observable(false),
+      };
+      s.pnl = ko.computed(function() {
+        return s.trades().reduce(function(sum, t) { return sum + t.pnl(); }, 0);
+      });
+      s.shadowTradesForStrategy = ko.computed(function() {
+        var n = s.name();
+        return vm.shadowTrades().filter(function(t) { return t.strategy === n; });
+      });
+      return s;
+    }
+
+    function updateStrategies(newData) {
+      var existing = {};
+      vm.strategies().forEach(function(s) { existing[s.name()] = s; });
+      var updated = newData.map(function(data) {
+        var s = existing[data.name];
+        if (!s) return makeStrategy(data);
+        s.lots(data.lots);
+        s.enabled(data.enabled);
+        s.paused(data.paused || false);
+        s.target(data.target);
+        s.sl(data.sl);
+        var existingTrades = {};
+        s.trades().forEach(function(t) { existingTrades[t.tradeID()] = t; });
+        var updatedTrades = (data.trades || []).map(function(td) {
+          var t = existingTrades[td.tradeID];
+          if (!t) return makeTrade(td);
+          t.filledQty(td.filledQty); t.entry(td.entry); t.exit(td.exit);
+          t.cmp(td.cmp); t.pnl(td.pnl); t.stopLoss(td.stopLoss);
+          t.startTimestamp(td.startTimestamp); t.endTimestamp(td.endTimestamp);
+          t.exitReason(td.exitReason); t.tradeState(td.tradeState);
+          t.slWhiskerHit(td.slWhiskerHit);
+          return t;
+        });
+        s.trades(updatedTrades);
+        return s;
+      });
+      vm.strategies(updated);
+    }
+
+    function approveDev(deviationId, expandSl, fixStrike, ignore) {
+      var params = [];
+      if (expandSl) params.push('expand_sl=true');
+      if (fixStrike) params.push('fix_strike=true');
+      if (ignore) params.push('ignore=true');
+      var url = vm.basePath + '/shadow/approve/' + deviationId + (params.length ? '?' + params.join('&') : '');
+      $.post(url).done(function() { refreshState(); }).fail(function(xhr) {
+        alert('Approval failed: ' + xhr.responseText);
+      });
+    }
+
+    function ignoreDev(deviationId, label) {
+      if (!confirm('Ignore this deviation (' + label + ')? Shadow will not re-flag it for the current trade.')) return;
+      approveDev(deviationId, false, false, true);
+    }
+
+    function refreshState() {
+      $.getJSON(vm.basePath + '/state', function(d) {
+        try {
+        updateStrategies(d.strategies);
+        vm.orders(d.orders);
+        vm.positions(d.positions);
+        vm.ltps(d.ltps);
+        vm.margins(d.margins);
+        vm.highestMarginUsed(d.highestMarginUsed);
+        vm.dayHighestPnl(d.dayHighestPnl || 0);
+        vm.dayLowestPnl(d.dayLowestPnl || 0);
+        vm.shadowDeviations(d.shadowDeviations || []);
+        vm.shadowLastRun(d.shadowLastRun || null);
+        vm.shadowStatus(d.shadowStatus || 'idle');
+        vm.shadowTrades(d.shadowTrades || []);
+        if (!d.isReady) { location.reload(); return; }
+        vm.isReady(d.isReady);
+
+        // Update tab title with overall pnl
+        $("title").html($("title").html().split('||')[0] + '|| ' + $(".pnl").text());
+
+        // Update ATM metadata for quote lookups
+        if (d.isReady) {
+          metadata.NIFTY.ATM    = Math.round(d.ltps["NIFTY 50"]   / metadata.NIFTY.round)    * metadata.NIFTY.round;
+          metadata.BANKNIFTY.ATM = Math.round(d.ltps["NIFTY BANK"] / metadata.BANKNIFTY.round) * metadata.BANKNIFTY.round;
+          metadata.SENSEX.ATM   = Math.round(d.ltps["SENSEX"]      / metadata.SENSEX.round)   * metadata.SENSEX.round;
+        }
+        } catch(e) { console.error('refreshState error:', e); }
+      }).fail(function(xhr) {
+        console.error('getJSON failed:', xhr.status, xhr.responseText);
+        location.reload();
+      });
+    }
+
+    var _refreshTimer = null;
+    function scheduleRefresh() {
+      var ltps = vm.ltps();
+      var ts = ltps && ltps.exchange_timestamp;
+      if (ts) {
+        var diffMs = Date.now() - new Date(ts).getTime();
+        if (diffMs > 15 * 60 * 1000) {
+          console.log('Exchange feed stale (' + Math.round(diffMs/60000) + ' min), stopping refresh.');
+          return;
+        }
+      }
+      _refreshTimer = setTimeout(function() { refreshState(); scheduleRefresh(); }, 5000);
+    }
+
+    $(function() {
+      ko.applyBindings(vm);
+      refreshState();
+      scheduleRefresh();
+    });
+    {% endif %}
+
+    function startAlgo() {
+      $('button').html('  Starting... <span class="spinner-border spinner-border-sm mr-2" role="status" aria-hidden="true"></span>').addClass('disabled');
+      var url = "/apis/algo/start"
+      var data = {};
+      $.post(url, {},
+        function (data, status, xhr) {
+          if (data.redirect) {
+            window.location.href = data.redirect;
+          } else {
+            alert('status: ' + status + ', data: ' + JSON.stringify(data));
+          }
+        },
+        'json'
+      );
+    }
+  </script>
+
+</head>
+<body class="p-2">
+    {% macro print_price (price) %}
+    {%if price> 0 %}
+    <b>{{"{:,.2f}".format(price)}}</b>
+    {% else %}
+    {{"{:,.2f}".format(price)}}
+    {% endif %}
+    {% endmacro %}
+    <div class="container-fluid font-monospace">
+        <div class="row justify-content-center">
+            <div class="col-xxl-7">
+    {% if algoStarted %}
+    <div id="ko-root">
+        {% if isReady %}
+        <div class="bg-light">
+          <div class="row gx-0">
+            <!-- ko if: shadowStatus() === 'running' -->
+            <div class="alert alert-info py-1 px-2 mb-1 small" role="alert">Shadow replay running...</div>
+            <!-- /ko -->
+            <div class="card my-1">
+              <h7 class="text-center">
+                <span data-bind="style: { color: marginInDeficit() ? 'red' : 'black' }"><span data-bind="text: strategies().length"></span> strategies running with {{multiple}}x </span>
+              </h7>
+            </div>
+          </div>
+          {% if session['access_token'] %}
+          <div class="row gx-0">
+            <div class="text-center col h6 d-none d-md-block">
+              Available: <span data-bind="fmtL: availableMargin">0.00L</span>
+              &nbsp;|&nbsp;
+              Peak Used: <span data-bind="text: highestMarginUsed().toFixed(2) + 'L'">0.00L</span>
+            </div>
+          </div>
+          <div class="row gx-0">
+            <div class="text-center col h6 d-none d-md-block">
+              Day High PnL: <span data-bind="fmtPnl: dayHighestPnl">0.00</span>
+              &nbsp;|&nbsp;
+              Day Low PnL: <span data-bind="fmtPnl: dayLowestPnl">0.00</span>
+            </div>
+          </div>
+          {% endif %}
+          <div class="row gx-0">
+            <div class="text-center col d-none d-md-block" data-bind="text: ltps().exchange_timestamp_display || ''"></div>
+            <div class="text-center col d-md-none" data-bind="text: ltps().exchange_timestamp_mobile || ''"></div>
+          </div>
+          <div class="row gx-0">
+              <p class="col focus-ring col-md-3 col-6 text-center border bg-light py-1 my-1"><strong>Nifty::<span data-bind="fmtLtp: function(){ return ltps()['NIFTY 50']; }"></span></strong></p>
+              <p class="col focus-ring col-md-3 col-6 text-center border bg-light py-1 my-1"><strong>BankNifty::<span data-bind="fmtLtp: function(){ return ltps()['NIFTY BANK']; }"></span></strong></p>
+              <p class="col focus-ring col-md-3 col-6 text-center border bg-light py-1 my-1"><strong>Sensex::<span data-bind="fmtLtp: function(){ return ltps()['SENSEX']; }"></span></strong></p>
+              <p class="col focus-ring col-md-3 col-6 text-center border bg-light py-1 my-1"><strong>VIX::<span data-bind="text: ltps()['INDIA VIX'] || ''"></span></strong></p>
+          </div>
+          <div class="row gx-0">
+              <ul class="nav nav-tabs nav-underline nav-fill px-0 gap-0" id="sections">
+                  <li class="nav-item"><a class="nav-link " data-bs-toggle="tab"  href="#tabs-strategies">Strategies</a></li>
+                  <li class="nav-item"><a class="nav-link " data-bs-toggle="tab"  href="#tabs-orders">Open Orders</a></li>
+                  <li class="nav-item"><a class="nav-link " data-bs-toggle="tab"  href="#tabs-positions">MIS Positions</a></li>
+              </ul>
+          </div>
+        </div>
+        {% endif %}
+
+            <div class="row gx-0 tab-content">
+                <div id="tabs-strategies" class="tab-pane px-0 py-1">
+                    <table class="table border">
+                    <tbody>
+                    <!-- ko foreach: strategies -->
+                        <!-- strategy header row -->
+                        <tr class="table-light">
+                            <th data-bind="style: { fontWeight: enabled() ? '' : 'normal', fontStyle: enabled() ? '' : 'italic' }"
+                                class="text-start px-1" colspan="8">
+                              <button class="btn btn-outline-secondary btn-sm py-0 px-1 me-1" style="font-size:0.7rem;line-height:1.2" data-bind="click: function(){ showShadow(!showShadow()); }, text: showShadow() ? '▲ shadow' : '▼ shadow', visible: shadowTradesForStrategy().length > 0"></button>
+                              <span data-bind="text: name"></span> :: <span data-bind="text: lots"></span>x ==&gt;
+                              <span data-bind="fmt2: target"></span> @ <span data-bind="fmt2: sl"></span>
+                              <!-- ko if: paused() -->
+                              <span class="badge bg-danger ms-1" title="New trades paused by shadow deviation — click Resume next to the deviation badge to unpause">&#9646; PAUSED</span>
+                              <!-- /ko -->
+                              <!-- ko foreach: $root.shadowDeviations().filter(function(d){
+                                if (d.strategy !== name()) return false;
+                                if (d.type === 'STRIKE_MISMATCH') {
+                                  return trades().some(function(t){ return t.isActive() && t.tradingSymbol() === d.live_symbol; });
+                                }
+                                return true;
+                              }) -->
+                              <!-- ko if: $data.type === 'SL_HIT_IN_SHADOW' -->
+                              <span class="badge bg-danger ms-1" data-bind="attr: { title: 'Shadow SL hit at ' + $data.shadow_sl + ' @ ' + $data.detected_at + ' but live trade still open' }">&#9888; SL HIT IN SHADOW</span>
+                              <button class="btn btn-sm btn-outline-danger py-0 ms-1" style="font-size:0.7rem;line-height:1.2" data-bind="click: function() { approveDev($data.deviation_id, false); }">Resume</button>
+                              <button class="btn btn-sm btn-outline-secondary py-0 ms-1" style="font-size:0.7rem;line-height:1.2" data-bind="click: function() { ignoreDev($data.deviation_id, 'SL HIT IN SHADOW'); }">Ignore</button>
+                              <!-- /ko -->
+                              <!-- ko if: $data.type === 'SL_TIGHTER' -->
+                              <span class="badge bg-warning text-dark ms-1" data-bind="attr: { title: 'Shadow SL=' + $data.shadow_sl + ' tighter than live SL=' + $data.live_sl }">&#9888; SL TIGHTER</span>
+                              <button class="btn btn-sm btn-outline-warning py-0 ms-1" style="font-size:0.7rem;line-height:1.2" data-bind="click: function() { approveDev($data.deviation_id, false); }">Resume</button>
+                              <button class="btn btn-sm btn-outline-secondary py-0 ms-1" style="font-size:0.7rem;line-height:1.2" data-bind="click: function() { ignoreDev($data.deviation_id, 'SL TIGHTER'); }">Ignore</button>
+                              <!-- /ko -->
+                              <!-- ko if: $data.type === 'STRIKE_MISMATCH' -->
+                              <span class="text-warning ms-1" data-bind="attr: { title: 'Strike mismatch: shadow=' + $data.shadow_symbol + ' live=' + $data.live_symbol }">&#9888;</span>
+                              <!-- /ko -->
+                              <!-- ko if: $data.type === 'MISSING_IN_LIVE' -->
+                              <span class="text-secondary ms-1" data-bind="attr: { title: 'Shadow has active trade ' + $data.shadow_symbol + ' but live has none' }">&#9888;</span>
+                              <!-- /ko -->
+                              <!-- /ko -->
+                            </th>
+                            <th class="text-end">
+                              {% if session['access_token'] %}
+                              <!-- ko if: enabled() && $root.powerMode() -->
+                              <a href="#" data-bind="click: function() { confirmExit($root.basePath + '/strategy/exit/' + name(), name()); }">Exit Strategy</a>
+                              <!-- /ko -->
+                              {% endif %}
+                            </th>
+                        </tr>
+                        <!-- trade rows -->
+                        <!-- ko foreach: trades -->
+                        <tr data-bind="attr: { id: tradeID }, css: { 'table-active': isActive, 'table-default': !isActive() }" class="border-0 border-bottom">
+                          <td class="text-center border-0 border-end border-secondary-subtle" data-bind="text: startTimestamp() || ''"></td>
+                          <td class="border-0 border-end border-secondary-subtle">
+                            <span data-bind="text: tradingSymbol"></span>
+                            <!-- ko if: deviationTag() -->
+                            <!-- ko if: deviationTag().type === 'EXTRA_IN_LIVE' -->
+                            <span class="badge bg-secondary ms-1" data-bind="attr: { title: 'Shadow has no matching trade for ' + tradingSymbol() }">EXTRA</span>
+                            <button class="btn btn-sm btn-outline-secondary py-0 ms-1" style="font-size:0.75rem;line-height:1.2" data-bind="click: function() { ignoreDev(deviationTag().deviation_id, 'EXTRA IN LIVE'); }">Ignore</button>
+                            <!-- /ko -->
+                            <!-- ko if: deviationTag().type === 'SL_HIT_IN_SHADOW' -->
+                            <span class="badge bg-danger ms-1" data-bind="attr: { title: 'Shadow SL hit @ ' + deviationTag().detected_at }">SL HIT</span>
+                            <button class="btn btn-sm btn-outline-secondary py-0 ms-1" style="font-size:0.75rem;line-height:1.2" data-bind="click: function() { ignoreDev(deviationTag().deviation_id, 'SL HIT IN SHADOW'); }">Ignore</button>
+                            <!-- /ko -->
+                            <!-- ko if: deviationTag().type === 'SL_TIGHTER' -->
+                            <span class="badge bg-warning text-dark ms-1" data-bind="attr: { title: 'Live SL=' + deviationTag().live_sl + ' tighter than shadow SL=' + deviationTag().shadow_sl }">SL TIGHTER</span>
+                            <button class="btn btn-sm btn-outline-warning py-0 ms-1" style="font-size:0.75rem;line-height:1.2" data-bind="click: function() { approveDev(deviationTag().deviation_id, true); }">Expand SL</button>
+                            <button class="btn btn-sm btn-outline-secondary py-0 ms-1" style="font-size:0.75rem;line-height:1.2" data-bind="click: function() { ignoreDev(deviationTag().deviation_id, 'SL TIGHTER'); }">Ignore</button>
+                            <!-- /ko -->
+                            <!-- ko if: deviationTag().type === 'STRIKE_MISMATCH' -->
+                            <span class="badge bg-warning text-dark ms-1">STRIKE MISMATCH</span>
+                            <span class="text-muted ms-1" style="font-size:0.8em" data-bind="text: tradingSymbol() + ' → ' + deviationTag().shadow_symbol"></span>
+                            <button class="btn btn-sm btn-outline-warning py-0 ms-1" style="font-size:0.75rem;line-height:1.2" data-bind="click: function() { approveDev(deviationTag().deviation_id, false, true); }">Fix Strike</button>
+                            <button class="btn btn-sm btn-outline-secondary py-0 ms-1" style="font-size:0.75rem;line-height:1.2" data-bind="click: function() { ignoreDev(deviationTag().deviation_id, 'STRIKE MISMATCH'); }">Ignore</button>
+                            <!-- /ko -->
+                            <!-- /ko -->
+                          </td>
+                          <td class="text-center border-0 border-end border-secondary-subtle d-none d-md-table-cell" data-bind="text: direction"></td>
+                          <td class="text-end border-0 border-end border-secondary-subtle d-none d-md-table-cell" data-bind="text: filledQty"></td>
+                          <td class="text-end border-0 border-end border-secondary-subtle d-md-none" colspan="2">
+                            <b data-bind="text: direction() === 'SHORT' ? '-' : '+'"></b><span data-bind="text: filledQty"></span>
+                          </td>
+                          <td class="text-end border-0 border-end border-secondary-subtle" data-bind="fmt2: entry"></td>
+                          <!-- ko if: isActive -->
+                          <td class="text-end border-0" data-bind="fmt2: cmp"></td>
+                          <td class="text-end border-0 border-start border-secondary-subtle" data-bind="fmtPnl: pnl"></td>
+                          <td class="text-center border-0 border-start border-secondary-subtle d-none d-md-table-cell" data-bind="text: slOrOpen"></td>
+                          <td class="border-0 text-center">
+                            {% if session['access_token'] %}
+                            <!-- ko if: $root.powerMode() -->
+                            <a href="#" data-bind="click: function() { confirmExit($root.basePath + '/trade/exit/' + tradeID(), tradingSymbol()); }">Exit Trade</a>
+                            <!-- /ko -->
+                            {% endif %}
+                          </td>
+                          <!-- /ko -->
+                          <!-- ko ifnot: isActive -->
+                          <td class="border-0 text-end">
+                            <span data-bind="fmt2: exit"></span>
+                            <!-- ko if: slWhiskerHit() -->
+                            <span title="Tick-only SL — candle did not confirm" style="cursor:help">&#9888;</span>
+                            <!-- /ko -->
+                          </td>
+                          <td class="border-0 text-end border-start border-secondary-subtle" data-bind="fmtPnl: pnl"></td>
+                          <td class="border-0 border-start border-secondary-subtle text-center d-none d-md-table-cell" data-bind="text: exitReason() || tradeState()"></td>
+                          <td class="border-0 border-start border-secondary-subtle text-center" data-bind="text: endTimestamp() || ''"></td>
+                          <!-- /ko -->
+                        </tr>
+                        <!-- /ko -->
+                        <!-- ko if: showShadow() -->
+                        <!-- ko foreach: shadowTradesForStrategy() -->
+                        <tr class="border-0" style="background:#f0f4ff;font-size:0.85em;opacity:0.85">
+                          <td class="text-center border-0 border-end border-secondary-subtle text-muted">shadow</td>
+                          <td class="border-0 border-end border-secondary-subtle">
+                            <span data-bind="text: tradingSymbol"></span>
+                            <!-- ko if: tradeState === 'active' && $root.shadowDeviations().some(function(d){ return d.type === 'MISSING_IN_LIVE' && d.shadow_symbol === tradingSymbol; }) -->
+                            <span class="badge bg-secondary ms-1" title="This shadow trade has no matching live trade">MISSING IN LIVE</span>
+                            <!-- /ko -->
+                          </td>
+                          <td class="text-center border-0 border-end border-secondary-subtle d-none d-md-table-cell" data-bind="text: direction"></td>
+                          <td class="text-end border-0 border-end border-secondary-subtle d-none d-md-table-cell" data-bind="text: filledQty"></td>
+                          <td class="text-end border-0 border-end border-secondary-subtle d-md-none" colspan="2"></td>
+                          <td class="text-end border-0 border-end border-secondary-subtle" data-bind="text: entry ? entry.toFixed(2) : ''"></td>
+                          <!-- ko if: tradeState === 'active' -->
+                          <td class="text-end border-0"></td>
+                          <td class="text-end border-0 border-start border-secondary-subtle" data-bind="text: pnl ? pnl.toFixed(2) : ''"></td>
+                          <td class="text-center border-0 border-start border-secondary-subtle d-none d-md-table-cell" data-bind="text: stopLoss ? 'SL @ ' + stopLoss.toFixed(2) : ''"></td>
+                          <td class="border-0"></td>
+                          <!-- /ko -->
+                          <!-- ko if: tradeState !== 'active' -->
+                          <td class="border-0 text-end" data-bind="text: exit ? exit.toFixed(2) : ''"></td>
+                          <td class="border-0 text-end border-start border-secondary-subtle" data-bind="text: pnl ? pnl.toFixed(2) : ''"></td>
+                          <td class="border-0 border-start border-secondary-subtle text-center d-none d-md-table-cell" data-bind="text: exitReason || tradeState"></td>
+                          <td class="border-0 border-start border-secondary-subtle text-center"></td>
+                          <!-- /ko -->
+                        </tr>
+                        <!-- /ko -->
+                        <!-- /ko -->
+                        {% if session['access_token'] %}
+                        <!-- ko if: name() === 'ManualStrategy' && enabled() -->
+                        <tr id="order" class="collapse manual">
+                          <td colspan="9" class="align-middle">
+                          <form class="row align-items-center" action="{{ request.path }}/trade/enter" method="post">
+                            <div class="col-11">
+                              <div class="row gx-1 gy-1 px-1 text-center">
+                                <div class="col-auto btn-group" role="group">
+                                    <input type="radio" class="btn-check" name="direction" value="LONG" id="BUY" autocomplete="off" >
+                                    <label class="btn btn-sm btn-outline-primary" for="BUY">BUY</label>
+                                    <input type="radio" class="btn-check" name="direction" value="SHORT" id="SELL" autocomplete="off" checked>
+                                    <label class="btn btn-sm btn-outline-danger" for="SELL">SELL</label>
+                                </div>
+                                <div class="col-auto btn-group border border-dark px-0" role="group">
+                                  <span class="input-group-text border-0 bg-light border-end d-sm-none d-md-block rounded-0 rounded-start">Qty</span>
+                                  <input type="number" class="form-control form-control-sm border-0 px-1" name="qty" id="qty" novalidate placeholder="Qty" value="15"  min="15" max="1000" step="15" required/>
+                                </div>
+                                <div class="col-2 px-1" role="group">
+                                  <input type="hidden" name="index" id="indexValue" value="NIFTY"/>
+                                  <select class="form-select form-control-sm px-1 border border-info" id="index">
+                                    <option value="NIFTY">Nifty</option>
+                                    <option value="BANKNIFTY">BankNifty</option>
+                                    <option value="SENSEX">Sensex</option>
+                                  </select>
+                                </div>
+                                <div class="col-auto btn-group">
+                                  <input type="number" class="form-control px-2 border border-info" style="width: 100px" name="strike" id="strike" placeholder="Strike" min="40000" max="50000" value="" step="100" required/>
+                                </div>
+                                <div class="col-auto btn-group" role="group">
+                                  <input type="radio" class="btn-check" name="type" value="CE" id="CE" autocomplete="off" checked>
+                                  <label class="btn btn-sm btn-outline-info " for="CE">CE</label>
+                                  <input type="radio" class="btn-check" name="type" value="PE" id="PE" autocomplete="off" >
+                                  <label class="btn btn-sm btn-outline-warning" for="PE">PE</label>
+                                </div>
+                                <div class="col-auto btn-group border border-dark px-0">
+                                  <span class="input-group-text border-0 border-end bg-light d-sm-none d-md-block px-1 rounded-0 rounded-start">for &#8377;</span>
+                                  <input type="number" class="form-control form-control-sm border-0 px-1" name="price" placeholder="Strike" min="0.05" max="1000" value="4.45" step="0.05" required/>
+                                </div>
+                                <div class="col-2 btn-group border border-danger"  role="group">
+                                  <span class="input-group-text border-0 bg-light rounded-0 rounded-start border-end">SL</span>
+                                  <input type="number" class="form-control form-control-sm  border-0" name="sl" placeholder="SL" value="4.45"  min="0" max="1000" step="0.05" required/>
+                                </div>
+                                <div class="col-2 px-1" role="group">
+                                  <select class="form-select form-control-sm px-1 border border-warning" name="strategyName">
+                                    <option value="">— Manual —</option>
+                                    <!-- ko foreach: $root.strategies() -->
+                                    <!-- ko if: enabled() && name() !== 'ManualStrategy' -->
+                                    <option data-bind="value: name, text: name"></option>
+                                    <!-- /ko -->
+                                    <!-- /ko -->
+                                  </select>
+                                </div>
+                              </div>
+                              <div class="row collapse advance py-1 text-center">
+                                <div class="btn-group col-auto border border-dark" role="group">
+                                  <select class="form-select">
+                                    <option value="0">Weekly</option>
+                                    <option value="1">Next Weekly</option>
+                                    <option value="m">Monthly</option>
+                                  </select>
+                                </div>
+                                <div class=" btn-group col-auto border border-primary"  role="group">
+                                  <span class="input-group-text border-0 bg-light rounded-0 rounded-start border-end">Trigger</span>
+                                  <input type="number" class="form-control border-0" name="trigger" placeholder="Strike" value="45.45"  min="0" max="1000" step="0.05" required/>
+                                </div>
+                                <div class=" btn-group col-auto border border-success"  role="group">
+                                  <span class="input-group-text border-0 bg-light border-end rounded-0 rounded-start">Target</span>
+                                  <input type="number" class="form-control border-0" name="target" placeholder="Strike" value="45.45" min="0" max="1000" step="0.05" required/>
+                                </div>
+                              </div>
+                            </div>
+                            <div class="col-1 text-start px-0">
+                                <input id="go1" type="submit" class="btn btn-primary" value="Go"/>
+                                <a data-bs-toggle="collapse" href=".advance" class="advance collapse show">
+                                  <i class="bi bi-chevron-double-down" role="button"></i>
+                                </a>
+                                <a data-bs-toggle="collapse" href=".advance" class="advance collapse">
+                                  <i class="bi bi-chevron-double-up" role="button"></i>
+                                </a>
+                            </div>
+                          </form>
+                          </td>
+                        </tr>
+                        <!-- /ko -->
+                        {% endif %}
+                        <!-- strategy total row -->
+                        <tr>
+                          <td colspan="6" class="text-end">Total :: </td>
+                          <td colspan="1" class="text-end" data-bind="fmtPnl: pnl"></td>
+                          <td colspan="2" class="text-end collapse manual show">
+                            {% if session['access_token'] %}
+                            <!-- ko if: name() === 'ManualStrategy' && enabled() -->
+                            <a href=".manual" class="collapse show manual" data-bs-toggle="collapse" data-bind="click: openManualOrder">Enter Manual Order</a>
+                            <!-- /ko -->
+                            {% endif %}
+                          </td>
+                        </tr>
+                    <!-- /ko -->
+                    </tbody>
+                    <tfoot>
+                      <!-- ko if: strategies().length > 0 -->
+                      <tr>
+                        <td colspan="7" class="text-end">Overall Total:<span class="pnl" data-bind="fmtPnl: overallPnl"></span></td>
+                        <td colspan="2"></td>
+                      </tr>
+                      <!-- /ko -->
+                    </tfoot>
+                    </table>
+                    {% if session['access_token'] %}
+                    <!-- ko if: strategies().length > 0 && !powerMode() -->
+                    <div class="text-center"><a href="#" id="powermode">Enable Power mode</a></div>
+                    <!-- /ko -->
+                    {% endif %}
+                </div>
+                <div id="tabs-orders" class="tab-pane px-0 py-1">
+                    <table class="table border px-0 py-1">
+                      <thead style="text-align: left;">
+                        <th>Tag</th>
+                        <th style="min-width: 150px;">Status</th>
+                        <th>Symbol</th>
+                        <th>Type</th>
+                        <th>Direction</th>
+                        <th class="text-center">Pending/Total</th>
+                        <th>LTP</th>
+                        <th class="text-center">Price/Trigger</th>
+                      </thead>
+                      <tbody data-bind="foreach: orders">
+                        <tr>
+                          <td data-bind="text: tag || ''"></td>
+                          <td data-bind="text: status"></td>
+                          <td data-bind="text: tradingsymbol"></td>
+                          <td data-bind="text: order_type"></td>
+                          <td data-bind="text: transaction_type"></td>
+                          <td class="text-center" data-bind="text: pending_quantity + '/' + quantity"></td>
+                          <td data-bind="text: ltp"></td>
+                          <td class="text-center" data-bind="text: price + '/' + trigger_price"></td>
+                        </tr>
+                      </tbody>
+                    </table>
+                </div>
+                <div id="tabs-positions" class="tab-pane px-0 py-1">
+                <table class="table border">
+                  <thead style="text-align: left;"><th>Symbol</th>
+                    <th class="text-center">Net</th>
+                  </thead>
+                  <tbody data-bind="foreach: positions">
+                    <tr>
+                      <td data-bind="text: tradingsymbol"></td>
+                      <td class="text-center" data-bind="text: quantity"></td>
+                    </tr>
+                  </tbody>
+                </table>
+                </div>
+
+            </div>
+        </div>
+        </div>
+    </div>
+    </div><!-- /ko-root -->
+    {% else %}
+        {% if session['access_token'] %}
+        <div class="row">
+            <div class="card border-0">
+                <div class="text-center card-body">
+                    <button type="button" class="btn btn-primary" onClick="startAlgo()">Start Algo</button>
+                </div>
+            </div>
+        </div>
+        <div class="row gx-0 my-3">
+          <div class="col text-center">
+            <a href="/me/{{short_code}}" class="btn btn-outline-primary mx-2">Home</a>
+            <a href="/history/{{short_code}}" class="btn btn-outline-secondary mx-2">History</a>
+          </div>
+        </div>
+        {% else %}
+        <div class="row gx-0 my-3">
+          <div class="col text-center">
+            <h5 class="mb-4">Choose an option:</h5>
+            <a href="/me/{{short_code}}" class="btn btn-primary mx-2">Login to Run Algo</a>
+            <a href="/backtesting/{{short_code}}" class="btn btn-info mx-2">Login to Backtest</a>
+          </div>
+        </div>
+        {% endif %}
+    {% endif %}
+    </div>
+    <script>
+    </script>
+</body>
+</html>

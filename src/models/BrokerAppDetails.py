@@ -5,6 +5,7 @@ class BrokerAppDetails:
     self.broker = broker
     self.appKey = None
     self.appSecret = None
+    self.short_code = None
 
   def setClientID(self, clientID):
     self.clientID = clientID

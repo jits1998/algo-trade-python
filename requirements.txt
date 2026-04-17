@@ -1,0 +1,18 @@
+Flask
+flask-session
+flask-sqlalchemy
+psycopg2-binary
+py_vollib
+requests
+pandas
+pandas-ta
+numpy
+kiteconnect
+breeze_connect @ git+https://github.com/jits1998/Breeze-Python-SDK@main
+python-dotenv
+plotly
+sqlalchemy
+black
+telethon
+pyarrow
+zstandard

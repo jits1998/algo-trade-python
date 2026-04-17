@@ -1,0 +1,575 @@
+<!-- ko if: results() -->
+<div class="card mt-3">
+  <div class="card-body">
+    <h5 class="card-title">Backtest Results</h5>
+    <!-- ko with: results() -->
+    <p class="text-muted mb-1">Period: <span data-bind="text: start_date"></span> to <span data-bind="text: end_date"></span></p>
+    <!-- /ko -->
+
+    <!-- Overall Risk Metrics (top, reacts to checkboxes) -->
+    <!-- ko if: overallMetrics().length > 0 -->
+    <h6 class="mt-2">Overall Risk Metrics <small class="text-muted fw-normal" style="font-size:0.75em;">— updates with row selections below</small></h6>
+    <div class="row g-2 mb-3">
+      <!-- ko foreach: overallMetrics -->
+      <div class="col-auto">
+        <div class="border rounded px-3 py-2" style="min-width:140px;">
+          <div class="text-muted small" data-bind="text: label"></div>
+          <div class="fw-bold" data-bind="text: value, css: cls"></div>
+        </div>
+      </div>
+      <!-- /ko -->
+    </div>
+    <!-- /ko -->
+
+    <!-- Strategy-wise Performance (aggregator checkboxes) -->
+    <!-- ko if: strategyRows().length > 0 -->
+    <h6 class="mt-3">Strategy-wise Performance</h6>
+    <div style="overflow-x: auto;">
+      <table class="table table-sm table-striped table-bordered table-hover align-middle">
+        <thead class="table-dark">
+          <tr>
+            <th title="Include in metrics">✓</th>
+            <th>Strategy</th>
+            <th class="text-end">Total PnL</th>
+            <th class="text-end">Avg PnL/Day</th>
+            <th class="text-center">Trades</th>
+            <th class="text-center">Win% / Days</th>
+            <th class="text-center">Win Days</th>
+            <th class="text-center">Loss Days</th>
+            <th class="text-end">Kelly Ratio</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- ko foreach: strategyRows -->
+          <tr data-bind="css: { 'opacity-50': !isIncluded }">
+            <td class="text-center">
+              <input type="checkbox" class="form-check-input" data-bind="triStateCheckbox: stratCheckbox" title="Include in metrics">
+            </td>
+            <td><strong data-bind="text: name"></strong></td>
+            <td class="text-end" data-bind="pnlCell: total_pnl"></td>
+            <td class="text-end" data-bind="fmtPnlText: avg_pnl_per_day"></td>
+            <td class="text-center" data-bind="text: total_trades"></td>
+            <td class="text-center"><span data-bind="text: win_rate.toFixed(1) + '%'"></span><br><small class="text-muted" data-bind="text: profitable_days + '/' + total_days"></small></td>
+            <td class="text-end text-success">
+              <div class="text-center"><span data-bind="fmtPnlText: avg_win"></span></div><!-- ko if: max1_pnl !== null --><small class="text-muted"><span data-bind="fmtPnlText: max1_pnl"></span><!-- ko if: max2_pnl !== null --> / <span data-bind="fmtPnlText: max2_pnl"></span><!-- /ko --></small><!-- /ko -->
+            </td>
+            <td class="text-end text-danger">
+              <div class="text-center"><span data-bind="fmtPnlText: avg_loss"></span></div><!-- ko if: min1_pnl !== null --><small class="text-muted"><span data-bind="fmtPnlText: min1_pnl"></span><!-- ko if: min2_pnl !== null --> / <span data-bind="fmtPnlText: min2_pnl"></span><!-- /ko --></small><!-- /ko -->
+            </td>
+            <td class="text-end" data-bind="css: { 'text-success': kelly_ratio > 0, 'text-danger': kelly_ratio <= 0 }">
+              <strong data-bind="text: kelly_ratio.toFixed(4)"></strong>
+            </td>
+          </tr>
+          <!-- /ko -->
+          <!-- TOTAL row — bound to filteredMetrics so it reacts to all checkbox changes -->
+          <!-- ko with: filteredMetrics() -->
+          <tr class="table-secondary fw-bold" style="border-top: 2px solid #000;">
+            <td></td>
+            <td><strong>TOTAL</strong></td>
+            <td class="text-end" data-bind="pnlCell: total_pnl"></td>
+            <td class="text-end" data-bind="fmtPnlText: avg_daily_pnl"></td>
+            <td class="text-center" data-bind="text: total_trades"></td>
+            <td class="text-center"><span data-bind="text: win_rate.toFixed(1) + '%'"></span><br><small class="text-muted" data-bind="text: profitable_days + '/' + days_tested"></small></td>
+            <td class="text-end text-success">
+              <div class="text-center"><span data-bind="fmtPnlText: avg_daily_win"></span></div><!-- ko if: max1_pnl !== null --><small class="text-muted"><span data-bind="fmtPnlText: max1_pnl"></span><!-- ko if: max2_pnl !== null --> / <span data-bind="fmtPnlText: max2_pnl"></span><!-- /ko --></small><!-- /ko -->
+            </td>
+            <td class="text-end text-danger">
+              <div class="text-center"><span data-bind="fmtPnlText: avg_daily_loss"></span></div><!-- ko if: min1_pnl !== null --><small class="text-muted"><span data-bind="fmtPnlText: min1_pnl"></span><!-- ko if: min2_pnl !== null --> / <span data-bind="fmtPnlText: min2_pnl"></span><!-- /ko --></small><!-- /ko -->
+            </td>
+            <td class="text-end" data-bind="css: { 'text-success': kelly_ratio > 0, 'text-danger': kelly_ratio <= 0 }">
+              <strong data-bind="text: kelly_ratio.toFixed(4)"></strong>
+            </td>
+          </tr>
+          <!-- /ko -->
+        </tbody>
+      </table>
+    </div>
+    <!-- /ko -->
+
+    <!-- Equity Curve (Plotly) -->
+    <!-- ko if: chartData() -->
+    <div class="mt-4 mb-1 d-flex align-items-center gap-2 flex-wrap">
+      <h6 class="mb-0">Equity Curve</h6>
+      <button class="btn btn-sm btn-outline-secondary" type="button"
+        data-bind="click: toggleChart, text: chartVisible() ? 'Hide' : 'Show'">Show</button>
+      <!-- ko if: chartVisible() -->
+      <div class="d-flex gap-2 flex-wrap align-items-center ms-2">
+        <!-- ko foreach: chartTraceNames -->
+        <button type="button" class="btn btn-sm"
+          data-bind="
+            css: $root._chartTraceSelected()[$data] !== false ? 'btn-secondary' : 'btn-outline-secondary',
+            text: $data,
+            click: function(){ $root.toggleChartTrace($data); }
+          "></button>
+        <!-- /ko -->
+      </div>
+      <!-- /ko -->
+    </div>
+    <div data-bind="css: { show: chartVisible }" class="collapse">
+      <div data-bind="attr: { id: _chartElId }, equityCurve: filteredChartData" style="width:100%;"></div>
+    </div>
+    <!-- /ko -->
+
+    <!-- Performance by Days to Expiry -->
+    <!-- ko if: dteEntries().length > 0 -->
+    <div class="mt-4 mb-1 d-flex align-items-center gap-2">
+      <h6 class="mb-0">Performance by Days to Expiry</h6>
+      <button class="btn btn-sm btn-outline-secondary" type="button"
+        data-bind="click: toggleDte, text: dteVisible() ? 'Hide' : 'Show'">Show</button>
+    </div>
+    <div data-bind="css: { show: dteVisible }" class="collapse">
+      <!-- Overall (All Strategies Combined) — aggregator checkboxes -->
+      <!-- ko foreach: dteEntries -->
+      <p class="mb-1 mt-2"><strong data-bind="text: label"></strong></p>
+      <div style="overflow-x: auto;">
+        <table class="table table-sm table-striped table-bordered table-hover mb-3 align-middle">
+          <thead class="table-dark">
+            <tr>
+              <th title="Include in metrics">✓</th>
+              <th>DTE</th>
+              <th class="text-end">Total PnL</th>
+              <th class="text-end">Avg PnL/Day</th>
+              <th class="text-center">Trades</th>
+              <th class="text-center">Win% / Days</th>
+              <th class="text-center">Win Days</th>
+              <th class="text-center">Loss Days</th>
+              <th class="text-end">Kelly Ratio</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- ko foreach: rows -->
+            <tr data-bind="css: { 'opacity-50': !dteCheckbox.checked && !dteCheckbox.indeterminate }">
+              <td class="text-center">
+                <input type="checkbox" class="form-check-input" data-bind="triStateCheckbox: dteCheckbox" title="Include in metrics">
+              </td>
+              <td><strong data-bind="text: dteLabel"></strong></td>
+              <td class="text-end" data-bind="pnlCell: total_pnl"></td>
+              <td class="text-end" data-bind="fmtPnlText: avg_pnl"></td>
+              <td class="text-center" data-bind="text: trades"></td>
+              <td class="text-center"><span data-bind="text: win_rate.toFixed(1) + '%'"></span><br><small class="text-muted" data-bind="text: wins + '/' + days"></small></td>
+              <td class="text-end text-success">
+                <div class="text-center"><span data-bind="fmtPnlText: avg_win"></span></div><!-- ko if: max1_pnl !== null --><small class="text-muted"><span data-bind="fmtPnlText: max1_pnl"></span><!-- ko if: max2_pnl !== null --> / <span data-bind="fmtPnlText: max2_pnl"></span><!-- /ko --></small><!-- /ko -->
+              </td>
+              <td class="text-end text-danger">
+                <div class="text-center"><span data-bind="fmtPnlText: avg_loss"></span></div><!-- ko if: min1_pnl !== null --><small class="text-muted"><span data-bind="fmtPnlText: min1_pnl"></span><!-- ko if: min2_pnl !== null --> / <span data-bind="fmtPnlText: min2_pnl"></span><!-- /ko --></small><!-- /ko -->
+              </td>
+              <td class="text-end" data-bind="css: { 'text-success': kelly_ratio > 0, 'text-danger': kelly_ratio <= 0 }">
+                <strong data-bind="text: kelly_ratio.toFixed(4)"></strong>
+              </td>
+            </tr>
+            <!-- /ko -->
+          </tbody>
+          <!-- ko with: totalRow() -->
+          <tfoot class="table-secondary fw-bold">
+            <tr>
+              <td></td>
+              <td>Total</td>
+              <td class="text-end" data-bind="pnlCell: total_pnl"></td>
+              <td class="text-end" data-bind="fmtPnlText: avg_pnl"></td>
+              <td class="text-center" data-bind="text: trades"></td>
+              <td class="text-center"><span data-bind="text: win_rate.toFixed(1) + '%'"></span><br><small class="text-muted" data-bind="text: wins + '/' + days"></small></td>
+              <td class="text-end text-success">
+                <div class="text-center"><span data-bind="fmtPnlText: avg_win"></span></div><!-- ko if: max1_pnl !== null --><small class="text-muted"><span data-bind="fmtPnlText: max1_pnl"></span><!-- ko if: max2_pnl !== null --> / <span data-bind="fmtPnlText: max2_pnl"></span><!-- /ko --></small><!-- /ko -->
+              </td>
+              <td class="text-end text-danger">
+                <div class="text-center"><span data-bind="fmtPnlText: avg_loss"></span></div><!-- ko if: min1_pnl !== null --><small class="text-muted"><span data-bind="fmtPnlText: min1_pnl"></span><!-- ko if: min2_pnl !== null --> / <span data-bind="fmtPnlText: min2_pnl"></span><!-- /ko --></small><!-- /ko -->
+              </td>
+              <td class="text-end" data-bind="css: { 'text-success': kelly_ratio > 0, 'text-danger': kelly_ratio <= 0 }">
+                <strong data-bind="text: kelly_ratio.toFixed(4)"></strong>
+              </td>
+            </tr>
+          </tfoot>
+          <!-- /ko -->
+        </table>
+      </div>
+      <!-- /ko -->
+
+      <!-- Per-strategy DTE breakdown (primary filter checkboxes) -->
+      <!-- ko if: dteStratEntries().length > 0 -->
+      <div class="mb-2 d-flex align-items-center gap-2">
+        <span class="text-muted small">Per-strategy breakdown</span>
+        <button class="btn btn-sm btn-outline-secondary" type="button"
+          data-bind="click: toggleDteStrat, text: dteStratVisible() ? 'Hide' : 'Show'">Show</button>
+      </div>
+      <div data-bind="css: { show: dteStratVisible }" class="collapse">
+        <!-- ko foreach: dteStratEntries -->
+        <p class="mb-1 mt-2"><strong data-bind="text: label"></strong></p>
+        <div style="overflow-x: auto;">
+          <table class="table table-sm table-striped table-bordered table-hover mb-3 align-middle">
+            <thead class="table-dark">
+              <tr>
+                <th title="Include in metrics">✓</th>
+                <th>DTE</th>
+                <th class="text-end">Total PnL</th>
+                <th class="text-end">Avg PnL/Day</th>
+                <th>Trades</th>
+                <th>Days (Win%)</th>
+                <th class="text-center">Win Days</th>
+                <th class="text-center">Loss Days</th>
+                <th class="text-end">Kelly Ratio</th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- ko foreach: rows -->
+              <tr data-bind="css: { 'opacity-50': !dteCheckbox.checked && !dteCheckbox.indeterminate }">
+                <td class="text-center">
+                  <input type="checkbox" class="form-check-input" data-bind="triStateCheckbox: dteCheckbox" title="Include in metrics">
+                </td>
+                <td><strong data-bind="text: dteLabel"></strong></td>
+                <td class="text-end" data-bind="pnlCell: total_pnl"></td>
+                <td class="text-end" data-bind="fmtPnlText: avg_pnl"></td>
+                <td data-bind="text: trades"></td>
+                <td><span data-bind="text: win_rate.toFixed(1) + '%'"></span><br><small class="text-muted" data-bind="text: wins + '/' + days"></small></td>
+                <td class="text-end text-success">
+                  <div class="text-center"><span data-bind="fmtPnlText: avg_win"></span></div><!-- ko if: max1_pnl !== null --><small class="text-muted"><span data-bind="fmtPnlText: max1_pnl"></span><!-- ko if: max2_pnl !== null --> / <span data-bind="fmtPnlText: max2_pnl"></span><!-- /ko --></small><!-- /ko -->
+                </td>
+                <td class="text-end text-danger">
+                  <div class="text-center"><span data-bind="fmtPnlText: avg_loss"></span></div><!-- ko if: min1_pnl !== null --><small class="text-muted"><span data-bind="fmtPnlText: min1_pnl"></span><!-- ko if: min2_pnl !== null --> / <span data-bind="fmtPnlText: min2_pnl"></span><!-- /ko --></small><!-- /ko -->
+                </td>
+                <td class="text-end" data-bind="css: { 'text-success': kelly_ratio > 0, 'text-danger': kelly_ratio <= 0 }">
+                  <strong data-bind="text: kelly_ratio.toFixed(4)"></strong>
+                </td>
+              </tr>
+              <!-- /ko -->
+            </tbody>
+            <!-- ko with: totalRow() -->
+            <tfoot class="table-secondary fw-bold">
+              <tr>
+                <td></td>
+                <td>Total</td>
+                <td class="text-end" data-bind="pnlCell: total_pnl"></td>
+                <td class="text-end" data-bind="fmtPnlText: avg_pnl"></td>
+                <td data-bind="text: trades"></td>
+                <td><span data-bind="text: win_rate.toFixed(1) + '%'"></span><br><small class="text-muted" data-bind="text: wins + '/' + days"></small></td>
+                <td class="text-end text-success">
+                  <div class="text-center"><span data-bind="fmtPnlText: avg_win"></span></div><!-- ko if: max1_pnl !== null --><small class="text-muted"><span data-bind="fmtPnlText: max1_pnl"></span><!-- ko if: max2_pnl !== null --> / <span data-bind="fmtPnlText: max2_pnl"></span><!-- /ko --></small><!-- /ko -->
+                </td>
+                <td class="text-end text-danger">
+                  <div class="text-center"><span data-bind="fmtPnlText: avg_loss"></span></div><!-- ko if: min1_pnl !== null --><small class="text-muted"><span data-bind="fmtPnlText: min1_pnl"></span><!-- ko if: min2_pnl !== null --> / <span data-bind="fmtPnlText: min2_pnl"></span><!-- /ko --></small><!-- /ko -->
+                </td>
+                <td class="text-end" data-bind="css: { 'text-success': kelly_ratio > 0, 'text-danger': kelly_ratio <= 0 }">
+                  <strong data-bind="text: kelly_ratio.toFixed(4)"></strong>
+                </td>
+              </tr>
+            </tfoot>
+            <!-- /ko -->
+          </table>
+        </div>
+        <!-- /ko -->
+      </div>
+      <!-- /ko -->
+
+      <!-- DTE-wise Strategy breakdown -->
+      <!-- ko if: dteWiseStratEntries().length > 0 -->
+      <div class="mb-2 mt-3 d-flex align-items-center gap-2">
+        <span class="text-muted small">DTE-wise strategy breakdown</span>
+        <button class="btn btn-sm btn-outline-secondary" type="button"
+          data-bind="click: toggleDteWiseStrat, text: dteWiseStratVisible() ? 'Hide' : 'Show'">Show</button>
+      </div>
+      <div data-bind="css: { show: dteWiseStratVisible }" class="collapse">
+        <!-- ko foreach: dteWiseStratEntries -->
+        <div class="mb-1 mt-2 d-flex align-items-center gap-2">
+          <strong>DTE <span data-bind="text: dteLabel"></span></strong>
+          <div class="form-check form-check-inline ms-2 mb-0">
+            <input class="form-check-input" type="checkbox" data-bind="checked: excludeTop2" id="">
+            <label class="form-check-label small text-muted">Excl. top 2 profit days</label>
+          </div>
+        </div>
+        <div style="overflow-x: auto;">
+          <table class="table table-sm table-striped table-bordered table-hover mb-3 align-middle">
+            <thead class="table-dark">
+              <tr>
+                <th title="Include in metrics">✓</th>
+                <th class="dbd-sort-th" data-bind="click: function(){ sortBy('stratLabel') }">Strategy<span data-bind="text: sortArrow('stratLabel')"></span></th>
+                <th class="dbd-sort-th text-end" data-bind="click: function(){ sortBy('total_pnl') }">Total PnL<span data-bind="text: sortArrow('total_pnl')"></span></th>
+                <th class="dbd-sort-th text-end" data-bind="click: function(){ sortBy('avg_pnl') }">Avg PnL/Day<span data-bind="text: sortArrow('avg_pnl')"></span></th>
+                <th class="dbd-sort-th text-center" data-bind="click: function(){ sortBy('trades') }">Trades<span data-bind="text: sortArrow('trades')"></span></th>
+                <th class="dbd-sort-th text-center" data-bind="click: function(){ sortBy('win_rate') }">Win% / Days<span data-bind="text: sortArrow('win_rate')"></span></th>
+                <th class="dbd-sort-th text-center" data-bind="click: function(){ sortBy('avg_win') }">Win Days<span data-bind="text: sortArrow('avg_win')"></span></th>
+                <th class="dbd-sort-th text-center" data-bind="click: function(){ sortBy('avg_loss') }">Loss Days<span data-bind="text: sortArrow('avg_loss')"></span></th>
+                <th class="dbd-sort-th text-end" data-bind="click: function(){ sortBy('kelly_ratio') }">Kelly Ratio<span data-bind="text: sortArrow('kelly_ratio')"></span></th>
+              </tr>
+            </thead>
+            <tbody>
+              <!-- ko foreach: sortedRows() -->
+              <tr data-bind="css: { 'opacity-50': !dteCheckbox.checked && !dteCheckbox.indeterminate }">
+                <td class="text-center">
+                  <input type="checkbox" class="form-check-input" data-bind="triStateCheckbox: dteCheckbox" title="Include in metrics">
+                </td>
+                <td style="min-width:120px;max-width:180px;white-space:normal;word-break:break-all"><strong data-bind="text: stratLabel"></strong></td>
+                <td class="text-end" data-bind="pnlCell: total_pnl"></td>
+                <td class="text-end" data-bind="fmtPnlText: avg_pnl"></td>
+                <td class="text-center" data-bind="text: trades"></td>
+                <td class="text-center"><span data-bind="text: win_rate.toFixed(1) + '%'"></span><br><small class="text-muted" data-bind="text: wins + '/' + days"></small></td>
+                <td class="text-end text-success">
+                  <div class="text-center"><span data-bind="fmtPnlText: avg_win"></span></div><!-- ko if: max1_pnl !== null --><small class="text-muted"><span data-bind="fmtPnlText: max1_pnl"></span><!-- ko if: max2_pnl !== null --> / <span data-bind="fmtPnlText: max2_pnl"></span><!-- /ko --></small><!-- /ko -->
+                </td>
+                <td class="text-end text-danger">
+                  <div class="text-center"><span data-bind="fmtPnlText: avg_loss"></span></div><!-- ko if: min1_pnl !== null --><small class="text-muted"><span data-bind="fmtPnlText: min1_pnl"></span><!-- ko if: min2_pnl !== null --> / <span data-bind="fmtPnlText: min2_pnl"></span><!-- /ko --></small><!-- /ko -->
+                </td>
+                <td class="text-end" data-bind="css: { 'text-success': kelly_ratio > 0, 'text-danger': kelly_ratio <= 0 }">
+                  <strong data-bind="text: kelly_ratio.toFixed(4)"></strong>
+                </td>
+              </tr>
+              <!-- /ko -->
+            </tbody>
+            <!-- ko with: filteredTotalRow() -->
+            <tfoot class="table-secondary fw-bold">
+              <tr>
+                <td></td>
+                <td>Total</td>
+                <td class="text-end" data-bind="pnlCell: total_pnl"></td>
+                <td class="text-end" data-bind="fmtPnlText: avg_pnl"></td>
+                <td class="text-center" data-bind="text: trades"></td>
+                <td class="text-center"><span data-bind="text: win_rate.toFixed(1) + '%'"></span><br><small class="text-muted" data-bind="text: wins + '/' + days"></small></td>
+                <td class="text-end text-success">
+                  <div class="text-center"><span data-bind="fmtPnlText: avg_win"></span></div><!-- ko if: max1_pnl !== null --><small class="text-muted"><span data-bind="fmtPnlText: max1_pnl"></span><!-- ko if: max2_pnl !== null --> / <span data-bind="fmtPnlText: max2_pnl"></span><!-- /ko --></small><!-- /ko -->
+                </td>
+                <td class="text-end text-danger">
+                  <div class="text-center"><span data-bind="fmtPnlText: avg_loss"></span></div><!-- ko if: min1_pnl !== null --><small class="text-muted"><span data-bind="fmtPnlText: min1_pnl"></span><!-- ko if: min2_pnl !== null --> / <span data-bind="fmtPnlText: min2_pnl"></span><!-- /ko --></small><!-- /ko -->
+                </td>
+                <td class="text-end" data-bind="css: { 'text-success': kelly_ratio > 0, 'text-danger': kelly_ratio <= 0 }">
+                  <strong data-bind="text: kelly_ratio.toFixed(4)"></strong>
+                </td>
+              </tr>
+            </tfoot>
+            <!-- /ko -->
+          </table>
+        </div>
+        <!-- /ko -->
+      </div>
+      <!-- /ko -->
+    </div>
+    <!-- /ko -->
+
+    <!-- Monthly PnL Breakdown -->
+    <!-- ko if: monthlyData() -->
+    <div class="mt-4 mb-1 d-flex align-items-center gap-2">
+      <h6 class="mb-0">Monthly PnL Breakdown</h6>
+      <button class="btn btn-sm btn-outline-secondary" type="button"
+        data-bind="click: toggleMonthly, text: monthlyVisible() ? 'Hide' : 'Show'">Show</button>
+    </div>
+    <div data-bind="css: { show: monthlyVisible }" class="collapse">
+      <div style="overflow-x: auto; font-size: 0.9em;">
+        <!-- ko with: monthlyData() -->
+        <table class="table table-sm table-bordered table-hover" style="table-layout: fixed; min-width: 900px;">
+          <thead class="table-dark">
+            <tr>
+              <th>Year</th>
+              <!-- ko foreach: monthNames -->
+              <th class="text-end" data-bind="text: $data"></th>
+              <!-- /ko -->
+              <th class="text-end">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- ko foreach: years -->
+            <tr>
+              <td><strong data-bind="text: year"></strong></td>
+              <!-- ko foreach: months -->
+              <!-- ko if: $data !== null -->
+              <td class="text-end" data-bind="pnlCell: $data"></td>
+              <!-- /ko -->
+              <!-- ko if: $data === null -->
+              <td class="text-muted text-end">-</td>
+              <!-- /ko -->
+              <!-- /ko -->
+              <td class="text-end fw-bold" data-bind="pnlCell: yearTotal"></td>
+            </tr>
+            <!-- /ko -->
+          </tbody>
+        </table>
+        <!-- /ko -->
+      </div>
+    </div>
+    <!-- /ko -->
+
+    <!-- Weekly PnL Breakdown -->
+    <!-- ko if: weeklyData() -->
+    <div class="mt-4 mb-1 d-flex align-items-center gap-2">
+      <h6 class="mb-0">Weekly PnL Breakdown</h6>
+      <button class="btn btn-sm btn-outline-secondary" type="button"
+        data-bind="click: toggleWeekly, text: weeklyVisible() ? 'Hide' : 'Show'">Show</button>
+    </div>
+    <div data-bind="css: { show: weeklyVisible }" class="collapse">
+      <div style="overflow-x: auto; font-size: 0.9em;">
+        <!-- ko with: weeklyData() -->
+        <table class="table table-sm table-bordered table-hover">
+          <thead class="table-dark">
+            <tr>
+              <th>Week</th>
+              <th>Date Range</th>
+              <th class="text-center">Days</th>
+              <th class="text-end">PnL</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- ko foreach: weeks -->
+            <tr>
+              <td data-bind="text: week"></td>
+              <td style="white-space:nowrap" data-bind="text: dateRange"></td>
+              <td class="text-center" data-bind="text: days"></td>
+              <td class="text-end" data-bind="pnlCell: pnl"></td>
+            </tr>
+            <!-- /ko -->
+          </tbody>
+          <tfoot class="table-secondary fw-bold">
+            <tr>
+              <td>Total</td>
+              <td data-bind="text: winWeeks + '/' + totalWeeks + ' weeks profitable'"></td>
+              <td></td>
+              <td class="text-end" data-bind="pnlCell: totalPnl"></td>
+            </tr>
+          </tfoot>
+        </table>
+        <!-- /ko -->
+      </div>
+    </div>
+    <!-- /ko -->
+
+    <!-- Weekday PnL Breakdown (aggregator checkboxes) -->
+    <!-- ko if: weekdayRows().length > 0 -->
+    <div class="mt-4 mb-1 d-flex align-items-center gap-2">
+      <h6 class="mb-0">Weekday PnL Breakdown</h6>
+      <button class="btn btn-sm btn-outline-secondary" type="button"
+        data-bind="click: toggleWeekday, text: weekdayVisible() ? 'Hide' : 'Show'">Show</button>
+    </div>
+    <div data-bind="css: { show: weekdayVisible }" class="collapse">
+      <div style="overflow-x: auto; font-size: 0.9em;">
+        <table class="table table-sm table-striped table-bordered table-hover">
+          <thead class="table-dark">
+            <tr>
+              <th title="Include in metrics">✓</th>
+              <th>Day</th>
+              <th class="text-end">Total PnL</th>
+              <th class="text-end">Avg PnL/Day</th>
+              <th>Days</th>
+              <th>Win Rate</th>
+              <th class="text-end">Avg Win Day</th>
+              <th class="text-end">Avg Loss Day</th>
+              <th class="text-end">Kelly Ratio</th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- ko foreach: weekdayRows -->
+            <tr data-bind="css: { 'opacity-50': !weekdayCheckbox.checked && !weekdayCheckbox.indeterminate }">
+              <td class="text-center">
+                <input type="checkbox" class="form-check-input" data-bind="triStateCheckbox: weekdayCheckbox" title="Include in metrics">
+              </td>
+              <td><strong data-bind="text: label"></strong></td>
+              <td class="text-end" data-bind="pnlCell: totalPnl"></td>
+              <td class="text-end" data-bind="fmtPnlText: avg_pnl"></td>
+              <td data-bind="text: profitable_days + '/' + totalDays"></td>
+              <td data-bind="text: win_rate.toFixed(2) + '%'"></td>
+              <td class="text-end text-success" data-bind="fmtPnlText: avg_win"></td>
+              <td class="text-end text-danger" data-bind="fmtPnlText: avg_loss"></td>
+              <td class="text-end" data-bind="css: { 'text-success': kelly_ratio > 0, 'text-danger': kelly_ratio <= 0 }">
+                <strong data-bind="text: kelly_ratio.toFixed(4)"></strong>
+              </td>
+            </tr>
+            <!-- /ko -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <!-- /ko -->
+
+    <!-- Daily PnL by Strategy (date checkboxes) -->
+    <!-- ko if: results() && results().daily_breakdown -->
+    <div class="mt-4 mb-1 d-flex align-items-center gap-2">
+      <h6 class="mb-0">Daily PnL by Strategy</h6>
+      <button class="btn btn-sm btn-outline-secondary" type="button"
+        data-bind="click: toggleDaily, text: dailyVisible() ? 'Hide' : 'Show'">Show</button>
+    </div>
+    <div data-bind="css: { show: dailyVisible }" class="collapse">
+      <div style="overflow-x: auto; font-size: 0.9em;">
+        <table class="table table-sm table-striped table-bordered table-hover">
+          <thead class="table-dark align-middle">
+            <tr>
+              <th title="Include in metrics">✓</th>
+              <th class="dbd-sort-th" data-bind="click: function(){ sortBy('date'); }">
+                Date<span data-bind="text: sortArrow('date')"></span>
+              </th>
+              <th class="dbd-sort-th" data-bind="click: function(){ sortBy('weekday'); }">
+                Day<span data-bind="text: sortArrow('weekday')"></span>
+              </th>
+              <th class="dbd-sort-th text-center" data-bind="click: function(){ sortBy('dte'); }">
+                DTE<span data-bind="text: sortArrow('dte')"></span>
+              </th>
+              <!-- ko foreach: allStrategies -->
+              <th class="dbd-sort-th" style="min-width:70px; max-width:120px; white-space:normal; word-break:break-word;" data-bind="click: function(){ $root.sortBy($data); }, css: { 'text-decoration-underline': $root.isSortedBy($data) }">
+                <span data-bind="text: $data"></span><span data-bind="text: $root.sortArrow($data)"></span>
+              </th>
+              <!-- /ko -->
+              <th class="dbd-sort-th text-end" data-bind="click: function(){ sortBy('total'); }">
+                Total<span data-bind="text: sortArrow('total')"></span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <!-- ko foreach: sortedDays -->
+            <tr data-bind="css: { 'opacity-50': !isIncluded }">
+              <td class="text-center">
+                <input type="checkbox" class="form-check-input" data-bind="triStateCheckbox: dateCheckbox" title="Include in metrics">
+              </td>
+              <td style="white-space:nowrap" data-bind="text: date"></td>
+              <td class="text-muted" data-bind="text: weekday"></td>
+              <td class="text-muted text-center" data-bind="text: dte != null ? dte : '-'"></td>
+              <!-- ko foreach: stratCells -->
+              <td data-bind="
+                  css: { 'text-success': pnl > 0, 'text-danger': pnl < 0, 'text-muted': pnl === 0 },
+                  click: function(){ $root.showTradeDetails($parent.date, run_id, strategy); },
+                  attr: { title: 'Click to view trades' },
+                  style: { cursor: 'pointer' }
+                ">
+                <span data-bind="fmtPnlText: pnl"></span>
+                <!-- ko if: qty > 0 -->
+                <br><small class="text-muted" style="font-size:0.8em;" data-bind="text: 'q:' + qty"></small>
+                <!-- /ko -->
+                <!-- ko if: highest_pnl !== 0 || lowest_pnl !== 0 -->
+                <br><small class="text-muted" style="font-size:0.85em;">
+                  ↑<span data-bind="fmtPnlText: highest_pnl"></span>
+                  ↓<span data-bind="fmtPnlText: lowest_pnl"></span>
+                </small>
+                <!-- /ko -->
+              </td>
+              <!-- /ko -->
+              <td class="text-end fw-bold" style="cursor:pointer;"
+                data-bind="
+                  css: { 'text-success': pnl > 0, 'text-danger': pnl < 0, 'text-muted': pnl === 0 },
+                  click: function(){ $root.showTradeDetails(date, run_id, 'TOTAL'); },
+                  attr: { title: 'Click to view all trades' }
+                ">
+                <strong data-bind="fmtPnlText: pnl"></strong>
+                <!-- ko if: highest_pnl !== 0 || lowest_pnl !== 0 -->
+                <br><small class="text-muted" style="font-size:0.85em;">
+                  ↑<span data-bind="fmtPnlText: highest_pnl"></span>
+                  ↓<span data-bind="fmtPnlText: lowest_pnl"></span>
+                </small>
+                <!-- /ko -->
+              </td>
+            </tr>
+            <!-- /ko -->
+            <!-- Average row -->
+            <tr class="table-secondary">
+              <td colspan="4"><strong>Average</strong></td>
+              <!-- ko foreach: strategyAvgPnls -->
+              <td data-bind="css: { 'text-success': $data > 0, 'text-danger': $data < 0, 'text-muted': $data === 0 }">
+                <strong data-bind="fmtPnlText: $data"></strong>
+              </td>
+              <!-- /ko -->
+              <!-- ko with: filteredMetrics() -->
+              <td class="text-end" data-bind="css: { 'text-success': avg_daily_pnl > 0, 'text-danger': avg_daily_pnl < 0, 'text-muted': avg_daily_pnl === 0 }">
+                <strong data-bind="fmtPnlText: avg_daily_pnl"></strong>
+              </td>
+              <!-- /ko -->
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <!-- /ko -->
+
+  </div>
+</div>
+<!-- /ko -->

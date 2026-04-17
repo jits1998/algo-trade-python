@@ -2,8 +2,8 @@ import logging
 import time
 
 from core.Controller import Controller
-from ticker.ZerodhaTicker import ZerodhaTicker
-from ordermgmt.ZerodhaOrderManager import ZerodhaOrderManager
+from broker.zerodha.ZerodhaTicker import ZerodhaTicker
+from broker.zerodha.ZerodhaOrderManager import ZerodhaOrderManager
 from ordermgmt.Order import Order
 from core.Quotes import Quotes
 from utils.Utils import Utils

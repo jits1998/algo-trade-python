@@ -3,11 +3,13 @@ import logging
 from core.Controller import Controller
 
 class BaseTicker:
-  def __init__(self, broker):
+  def __init__(self, broker, short_code):
+    self.short_code = short_code
     self.broker = broker
-    self.brokerLogin = Controller.getBrokerLogin()
+    self.brokerLogin = Controller.getBrokerLogin(short_code)
     self.ticker = None
     self.tickListeners = []
+    self.orderListeners = []
 
   def startTicker(self):
     pass
@@ -18,6 +20,10 @@ class BaseTicker:
   def registerListener(self, listener):
     # All registered tick listeners will be notified on new ticks
     self.tickListeners.append(listener)
+
+  def registerOrderListener(self, listener):
+    # All registered tick listeners will be notified on new ticks
+    self.orderListeners.append(listener)
 
   def registerSymbols(self, symbols):
     pass
@@ -44,11 +50,15 @@ class BaseTicker:
     logging.error('Ticker errored out. code = %d, reason = %s', code, reason)
 
   def onReconnect(self, attemptsCount):
-    logging.warn('Ticker reconnecting.. attemptsCount = %d', attemptsCount)
+    logging.warning('Ticker reconnecting.. attemptsCount = %d', attemptsCount)
 
   def onMaxReconnectsAttempt(self):
     logging.error('Ticker max auto reconnects attempted and giving up..')
 
-  def onOrderUpdate(self, data):
-    #logging.info('Ticker: order update %s', data)
-    pass
+  def onOrderUpdate(self, orderId, data):
+    # logging.info('New ticks received %s', ticks)
+    for listener in self.orderListeners:
+      try:
+        listener(orderId, data)
+      except Exception as e:
+        logging.error('BaseTicker: Exception from order listener callback function. Error => %s', str(e))
